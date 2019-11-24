@@ -13,8 +13,7 @@ postRouter
     const result = await api.get(
       `${routeName}.json${util.toQueryString(req.query)}`,
     )
-    res.json(result)
-    await Post.insertManyPost(result)
+    res.json(await Post.synchronizePosts(result))
     _downloadImages(result)
   })
   .post(async (req, res) => {
@@ -31,9 +30,8 @@ function _downloadImages(posts) {
 }
 
 async function _downloadImage(id, postType, url) {
-  if (!(await Post.hasImageDownloaded(id, postType))) {
+  if (!(await Post.hasImageDownloaded(id, postType)))
     Post.saveImage(api.download(url), id, postType, url.split('/').reverse()[0])
-  }
 }
 
 module.exports = postRouter
