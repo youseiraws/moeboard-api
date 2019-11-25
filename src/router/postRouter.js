@@ -17,7 +17,9 @@ postRouter
     _downloadImages(result)
   })
   .post(async (req, res) => {
-    res.json(await api.post(`${routeName}.json`, req.body))
+    const result = await api.post(`${routeName}.json`, req.body)
+    res.json(await Post.synchronizePosts(result))
+    _downloadImages(result)
   })
 
 function _downloadImages(posts) {

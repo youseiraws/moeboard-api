@@ -51,18 +51,22 @@ const postSchema = new mongoose.Schema(
       preview: {
         id: ObjectId,
         path: String,
+        url: String,
       },
       sample: {
         id: ObjectId,
         path: String,
+        url: String,
       },
       jpeg: {
         id: ObjectId,
         path: String,
+        url: String,
       },
       file: {
         id: ObjectId,
         path: String,
+        url: String,
       },
     },
   },
@@ -92,17 +96,15 @@ postSchema.statics = {
           const localPostObj = localPost.toObject()
           await Promise.all(
             Object.keys(localPostObj[cache]).map(async type => {
-              const base64 = await this.getImageBase64(
+              const url = await this.getCacheImageUrl(
                 localPostObj[cache][type],
                 localPostObj.id,
                 type,
                 localPostObj[`${type}_url`].split('/').reverse()[0],
               )
-              if (base64 !== undefined) {
+              if (url !== undefined) {
                 if (post[cache] === undefined) post[cache] = {}
-                post[cache][type] = `data:image/${
-                  localPostObj[`${type}_url`].split('.').reverse()[0]
-                };base64,${base64}`
+                post[cache][type] = url
               }
             }),
           )
@@ -132,6 +134,7 @@ postSchema.statics = {
   },
   saveImageToDB(imageStream, id, postType, imageName) {
     if (global.$gfs === undefined) return
+
     const gridFsStream = global.$gfs.createWriteStream({ imageName })
     imageStream.pipe(gridFsStream)
     gridFsStream.on('close', async file => {
@@ -147,10 +150,27 @@ postSchema.statics = {
     const cacheStream = fs.createWriteStream(fileName)
     imageStream.pipe(cacheStream)
     cacheStream.on('close', async () => {
-      let post = await this.findOne({ id })
-      post[cache][postType].path = fileName
-      await post.save()
+      await this.saveImagePath(id, postType, imageName)
+      await this.saveImageUrl(id, postType, imageName)
     })
+  },
+  async saveImagePath(id, postType, imageName) {
+    let post = await this.findOne({ id })
+    if (post === null) return ''
+
+    const imagePath = path.resolve(cache, id.toString(), postType, imageName)
+    post[cache][postType].path = imagePath
+    await post.save()
+    return imagePath
+  },
+  async saveImageUrl(id, postType, imageName) {
+    let post = await this.findOne({ id })
+    if (post === null) return ''
+
+    const imageUrl = [id.toString(), postType, imageName].join('/')
+    post[cache][postType].url = imageUrl
+    await post.save()
+    return imageUrl
   },
   async hasImageDownloaded(id, postType) {
     const post = await this.findOne({ id })
@@ -158,10 +178,14 @@ postSchema.statics = {
 
     return !(post.$isEmpty(cache) || post[cache][postType].id === undefined)
   },
-  async getImageBase64(type, id, postType, imageName) {
-    if (type.path !== undefined && fs.existsSync(type.path))
-      return await util.toImageBase64(fs.createReadStream(type.path))
-    else
+  async getCacheImageUrl(type, id, postType, imageName) {
+    if (type.path !== undefined && fs.existsSync(type.path)) {
+      const relativePath =
+        type.url !== undefined
+          ? type.url
+          : await this.saveImageUrl(id, postType, imageName)
+      return `http://${config.hostname}:${config.port}/${relativePath}`
+    } else
       this.saveImageToCache(
         global.$gfs.createReadStream({ _id: type.id }),
         id,

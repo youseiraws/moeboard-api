@@ -1,5 +1,3 @@
-const getRawBody = require('raw-body')
-
 module.exports = {
   toQueryString(query) {
     if (!(query instanceof Object) || Object.keys(query).length === 0) return ''
@@ -20,8 +18,5 @@ module.exports = {
       case 'day':
         return duration * 24 * 60 * 60 * 1000
     }
-  },
-  async toImageBase64(stream) {
-    return await getRawBody(stream, 'base64')
   },
 }
