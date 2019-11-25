@@ -1,9 +1,8 @@
 const mongoose = require('mongoose')
 const Grid = require('gridfs-stream')
-const config = require('../../config')
 
-function connect(source = config.source) {
-  mongoose.connect(`${config.mongoDBUri}${source}`, {
+exports.connect = function(source = global.$config.source) {
+  mongoose.connect(`${global.$config.mongoDBUri}${source}`, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     useFindAndModify: false,
@@ -11,9 +10,8 @@ function connect(source = config.source) {
   })
   const conn = mongoose.connection
   conn.once('open', () => (global.$gfs = Grid(conn.db, mongoose.mongo)))
-}
 
-module.exports = {
-  connect,
-  postSchema: require('./schema/postSchema'),
+  module.exports = {
+    postSchema: require('./schema/postSchema'),
+  }
 }

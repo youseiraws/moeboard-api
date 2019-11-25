@@ -1,12 +1,13 @@
+global.$config = require('./config')
 const app = require('express')()
-const bodyParser = require('body-parser')
+
 const connection = require('./src/database/connection')
-const router = require('./src/router')
-const config = require('./config')
+if (global.$config.useMongoDB) connection.connect()
 
-connection.connect()
-
+const bodyParser = require('body-parser')
 app.use(bodyParser.json())
+
+const router = require('./src/router')
 app.use(router)
 
-app.listen(config.port, config.hostname)
+app.listen(global.$config.port, global.$config.hostname)

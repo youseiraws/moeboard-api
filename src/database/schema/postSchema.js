@@ -1,12 +1,11 @@
 const fs = require('fs')
 const path = require('path')
-const stream = require('stream')
 const mongoose = require('mongoose')
 const util = require('../../util/util')
-const config = require('../../../config')
 
 const ObjectId = mongoose.Schema.Types.ObjectId
-const cache = config.cache
+const cache = global.$config.cache
+const expired = global.$config.expired
 
 const postSchema = new mongoose.Schema(
   {
@@ -74,12 +73,10 @@ const postSchema = new mongoose.Schema(
 )
 
 postSchema.statics = {
-  async synchronizePosts(posts) {
+  synchronizePosts(posts) {
     if (!(posts instanceof Array)) return posts
 
     this.insertPosts(posts)
-
-    return await this.mergeLocalImages(posts)
   },
   insertPosts(posts) {
     posts.forEach(async post => {
@@ -88,44 +85,18 @@ postSchema.statics = {
         await this.updateOne({ id: post.id }, post)
     })
   },
-  async mergeLocalImages(posts) {
-    return await Promise.all(
-      posts.map(async post => {
-        const localPost = await this.findOne({ id: post.id })
-        if (localPost !== null && !localPost.$isEmpty(cache)) {
-          const localPostObj = localPost.toObject()
-          await Promise.all(
-            Object.keys(localPostObj[cache]).map(async type => {
-              const url = await this.getCacheImageUrl(
-                localPostObj[cache][type],
-                localPostObj.id,
-                type,
-                localPostObj[`${type}_url`].split('/').reverse()[0],
-              )
-              if (url !== undefined) {
-                if (post[cache] === undefined) post[cache] = {}
-                post[cache][type] = url
-              }
-            }),
-          )
-        }
-
-        return post
-      }),
-    )
-  },
   async isPostExists(id) {
     return await this.exists({ id })
   },
   async isPostExpired(id) {
-    if (!config.expired.enable) return true
+    if (!expired.enable) return true
 
     const post = await this.findOne({ id })
     if (post === null) return false
 
     return (
       Date.now() - post._id.getTimestamp().getTime() >
-      util.getTimestamp(config.expired.time, config.expired.unit)
+      util.getTimestamp(expired.time, expired.unit)
     )
   },
   saveImage(imageStream, id, postType, imageName) {
@@ -178,20 +149,26 @@ postSchema.statics = {
 
     return !(post.$isEmpty(cache) || post[cache][postType].id === undefined)
   },
-  async getCacheImageUrl(type, id, postType, imageName) {
-    if (type.path !== undefined && fs.existsSync(type.path)) {
-      const relativePath =
-        type.url !== undefined
-          ? type.url
-          : await this.saveImageUrl(id, postType, imageName)
-      return `http://${config.hostname}:${config.port}/${relativePath}`
-    } else
-      this.saveImageToCache(
-        global.$gfs.createReadStream({ _id: type.id }),
-        id,
-        postType,
-        imageName,
-      )
+  async getCacheImageUrl(id, postType) {
+    const post = await this.findOne({ id })
+    if (post !== null && !post.$isEmpty(cache)) {
+      const postObj = post.toObject()
+      const type = postObj[cache][postType]
+      const imageName = postObj[`${postType}_url`].split('/').reverse()[0]
+      if (type.path !== undefined && fs.existsSync(type.path)) {
+        const imageUrl =
+          type.url !== undefined
+            ? type.url
+            : await this.saveImageUrl(id, postType, imageName)
+        return `http://${global.$config.hostname}:${global.$config.port}/${imageUrl}`
+      } else
+        this.saveImageToCache(
+          global.$gfs.createReadStream({ _id: type.id }),
+          id,
+          postType,
+          imageName,
+        )
+    }
   },
 }
 
