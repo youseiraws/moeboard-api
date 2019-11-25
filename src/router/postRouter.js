@@ -15,9 +15,10 @@ const routeName = '/post'
 postRouter
   .route(routeName)
   .get(async (req, res) => {
-    const result = await api.get(
+    let result = await api.get(
       `${routeName}.json${util.toQueryString(req.query)}`,
     )
+    result = _toWhiteSpace(result)
 
     if (useCache && useMongoDB) {
       Post.synchronizePosts(result)
@@ -25,11 +26,22 @@ postRouter
     } else if (useCache && !useMongoDB) {
       res.json(await _downloadImages(result))
     } else if (!useCache && useMongoDB) {
-    } else return result
+    } else res.json(result)
   })
   .post(async (req, res) => {
     const result = await api.post(`${routeName}.json`, req.body)
   })
+
+function _toWhiteSpace(posts) {
+  return posts.map(post => {
+    post.preview_url = post.preview_url.replace(/%20/g, ' ')
+    post.sample_url = post.sample_url.replace(/%20/g, ' ')
+    post.jpeg_url = post.jpeg_url.replace(/%20/g, ' ')
+    post.file_url = post.file_url.replace(/%20/g, ' ')
+
+    return post
+  })
+}
 
 async function _downloadImages(posts) {
   return await Promise.all(
@@ -78,7 +90,7 @@ async function _saveImage(imageStream, id, postType, imageName) {
   const filePath = path.resolve(cache, id.toString(), postType)
   const fileName = path.resolve(filePath, imageName)
   if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
-  fs.createWriteStream(fileName).end(await util.getRawBody(imageStream))
+  imageStream.pipe(fs.createWriteStream(fileName))
 }
 
 module.exports = postRouter

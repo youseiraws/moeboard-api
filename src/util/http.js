@@ -2,9 +2,9 @@ const axios = require('axios')
 const download = require('download')
 
 class Http {
-  constructor(baseURL, timeout = 6000) {
+  constructor(baseURL, timeout = 60000) {
     this.baseURL = baseURL
-    this.timeout = 6000
+    this.timeout = 60000
     this._init()
   }
 

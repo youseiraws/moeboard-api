@@ -3,7 +3,7 @@ module.exports = {
   hostname: 'localhost', //主机名
   source: 'konachan', // 图片源，可选值: konachan;
   useCache: true, // 是否启用图片缓存
-  useMongoDB: false, // 是否启用MongoDB
+  useMongoDB: true, // 是否启用MongoDB
   mongoDBUri: 'mongodb://localhost:27017/', // MongoDB地址
   // 数据时限设置
   expired: {
