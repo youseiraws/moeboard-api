@@ -8,6 +8,7 @@ const util = require('../util/util')
 const cache = global.$config.cache
 const useCache = global.$config.useCache
 const useMongoDB = global.$config.useMongoDB
+const cachePostTypes = global.$config.cachePostTypes
 const Post = useMongoDB ? mongoose.model('Post') : null
 const postRouter = express.Router()
 const routeName = '/post'
@@ -15,64 +16,66 @@ const routeName = '/post'
 postRouter
   .route(routeName)
   .get(async (req, res) => {
-    let result = await api.get(
-      `${routeName}.json${util.toQueryString(req.query)}`,
+    const result = _toWhiteSpace(
+      await api.get(`${routeName}.json${util.toQueryString(req.query)}`),
     )
-    result = _toWhiteSpace(result)
-
-    if (useCache && useMongoDB) {
-      Post.synchronizePosts(result)
-      res.json(await _downloadImages(result))
-    } else if (useCache && !useMongoDB) {
-      res.json(await _downloadImages(result))
-    } else if (!useCache && useMongoDB) {
-    } else res.json(result)
+    await _handleRequest(result, res)
   })
   .post(async (req, res) => {
-    const result = await api.post(`${routeName}.json`, req.body)
+    const result = _toWhiteSpace(await api.post(`${routeName}.json`, req.body))
+    await _handleRequest(result, res)
   })
 
 function _toWhiteSpace(posts) {
   return posts.map(post => {
-    post.preview_url = post.preview_url.replace(/%20/g, ' ')
-    post.sample_url = post.sample_url.replace(/%20/g, ' ')
-    post.jpeg_url = post.jpeg_url.replace(/%20/g, ' ')
-    post.file_url = post.file_url.replace(/%20/g, ' ')
-
-    return post
+    return Object.assign(
+      {},
+      post,
+      cachePostTypes.map(postType => ({
+        [`${postType}_url`]: post[`${postType}_url`].replace(/%20/g, ' '),
+      })),
+    )
   })
+}
+
+async function _handleRequest(result, res) {
+  let posts = Object.assign({}, result)
+  if (useCache) posts = await _downloadImages(result)
+  res.json(posts)
+  if (useMongoDB) Post.insertPosts(result)
 }
 
 async function _downloadImages(posts) {
   return await Promise.all(
     posts.map(async post => {
-      await _downloadImage(post, 'preview')
-      await _downloadImage(post, 'sample')
-      await _downloadImage(post, 'jpeg')
-      await _downloadImage(post, 'file')
-
+      await Promise.all(
+        cachePostTypes.map(async postType => {
+          const cacheUrl = await _downloadImage(
+            post.id,
+            postType,
+            post[`${postType}_url`],
+            post[cache],
+          )
+          if (cacheUrl !== undefined) {
+            if (post[cache] === undefined) post[cache] = {}
+            post[cache][postType] = cacheUrl
+          }
+        }),
+      )
       return post
     }),
   )
 }
 
-async function _downloadImage(post, postType) {
-  const id = post.id
-  const url = post[`${postType}_url`]
+async function _downloadImage(id, postType, url) {
   const imageName = url.split('/').reverse()[0]
   if (useMongoDB) {
     if (await Post.hasImageDownloaded(id, postType)) {
-      const cacheUrl = await Post.getCacheImageUrl(id, postType)
-      if (cacheUrl !== undefined) {
-        if (post[cache] === undefined) post[cache] = {}
-        post[cache][postType] = cacheUrl
-      }
+      return await Post.getCacheImageUrl(id, postType)
     } else Post.saveImage(api.download(url), id, postType, imageName)
   } else {
     if (_hasImageDownloaded(id, postType, imageName)) {
-      const cacheUrl = _getCacheImageUrl(id, postType, imageName)
-      if (post[cache] === undefined) post[cache] = {}
-      post[cache][postType] = cacheUrl
+      return _getCacheImageUrl(id, postType, imageName)
     } else _saveImage(api.download(url), id, postType, imageName)
   }
 }

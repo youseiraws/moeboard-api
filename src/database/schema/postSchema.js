@@ -73,12 +73,9 @@ const postSchema = new mongoose.Schema(
 )
 
 postSchema.statics = {
-  synchronizePosts(posts) {
+  insertPosts(posts) {
     if (!(posts instanceof Array)) return posts
 
-    this.insertPosts(posts)
-  },
-  insertPosts(posts) {
     posts.forEach(async post => {
       if (!(await this.isPostExists(post.id))) await this.create(post)
       else if (await this.isPostExpired(post.id))
