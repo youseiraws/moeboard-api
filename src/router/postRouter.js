@@ -26,6 +26,29 @@ postRouter
     await _handleRequest(result, res)
   })
 
+postRouter
+  .route('/random')
+  .get(async (req, res) => {
+    if (req.query.tags === undefined || req.query.tags.length === 0) {
+      req.query.tags = 'order:random'
+    } else {
+      req.query.tags += ' order:random'
+    }
+    const result = _toWhiteSpace(
+      await api.get(`${routeName}.json${util.toQueryString(req.query)}`),
+    )
+    await _handleRequest(result, res)
+  })
+  .post(async (req, res) => {
+    if (req.body.tags === undefined || req.body.tags.length === 0) {
+      req.body.tags = 'order:random'
+    } else {
+      req.body.tags += ' order:random'
+    }
+    const result = _toWhiteSpace(await api.post(`${routeName}.json`, req.body))
+    await _handleRequest(result, res)
+  })
+
 function _toWhiteSpace(posts) {
   return posts.map(post => {
     return Object.assign(
