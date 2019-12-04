@@ -16,13 +16,13 @@ const routeName = '/post'
 postRouter
   .route(routeName)
   .get(async (req, res) => {
-    const result = _toWhiteSpace(
-      await api.get(`${routeName}.json${util.toQueryString(req.query)}`),
+    const result = await api.get(
+      `${routeName}.json${util.toQueryString(req.query)}`,
     )
     await _handleRequest(result, res)
   })
   .post(async (req, res) => {
-    const result = _toWhiteSpace(await api.post(`${routeName}.json`, req.body))
+    const result = await api.post(`${routeName}.json`, req.body)
     await _handleRequest(result, res)
   })
 
@@ -34,8 +34,8 @@ postRouter
     } else {
       req.query.tags += ' order:random'
     }
-    const result = _toWhiteSpace(
-      await api.get(`${routeName}.json${util.toQueryString(req.query)}`),
+    const result = await api.get(
+      `${routeName}.json${util.toQueryString(req.query)}`,
     )
     await _handleRequest(result, res)
   })
@@ -45,21 +45,9 @@ postRouter
     } else {
       req.body.tags += ' order:random'
     }
-    const result = _toWhiteSpace(await api.post(`${routeName}.json`, req.body))
+    const result = await api.post(`${routeName}.json`, req.body)
     await _handleRequest(result, res)
   })
-
-function _toWhiteSpace(posts) {
-  return posts.map(post => {
-    return Object.assign(
-      {},
-      post,
-      cachePostTypes.map(postType => ({
-        [`${postType}_url`]: post[`${postType}_url`].replace(/%20/g, ' '),
-      })),
-    )
-  })
-}
 
 async function _handleRequest(result, res) {
   let posts = Object.assign({}, result)
@@ -81,7 +69,7 @@ async function _downloadImages(posts) {
           )
           if (cacheUrl !== undefined) {
             if (post[cache] === undefined) post[cache] = {}
-            post[cache][postType] = cacheUrl
+            post[cache][`${postType}_url`] = cacheUrl
           }
         }),
       )
@@ -91,7 +79,10 @@ async function _downloadImages(posts) {
 }
 
 async function _downloadImage(id, postType, url) {
-  const imageName = url.split('/').reverse()[0]
+  const imageName = decodeURI(url.split('/').reverse()[0]).replace(
+    /%5C|%2F|%3A|%2A|%3F|%22|%3C|%3E|%7C/g,
+    '',
+  )
   if (useMongoDB) {
     if (await Post.hasImageDownloaded(id, postType)) {
       return await Post.getCacheImageUrl(id, postType)
