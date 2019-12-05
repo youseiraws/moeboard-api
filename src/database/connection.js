@@ -13,5 +13,6 @@ exports.connect = function(source = global.$config.source) {
 
   module.exports = {
     postSchema: require('./schema/postSchema'),
+    tagSchema: require('./schema/tagSchema'),
   }
 }

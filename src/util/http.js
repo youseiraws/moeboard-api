@@ -12,7 +12,6 @@ class Http {
     this.http = axios.create({
       baseURL: this.baseURL,
       timeout: this.timeout,
-      headers: { 'content-type': 'application/json; charset=utf-8' },
     })
     this.http.interceptors.response.use(res => res.data)
   }

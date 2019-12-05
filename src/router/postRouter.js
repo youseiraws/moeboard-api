@@ -49,6 +49,21 @@ postRouter
     await _handleRequest(result, res)
   })
 
+postRouter
+  .route('/popular')
+  .get(async (req, res) => {
+    const url = _popularTypeToUrl(req.query.type)
+    delete req.query.type
+    const result = await api.get(`${url}${util.toQueryString(req.query)}`)
+    await _handleRequest(result, res)
+  })
+  .post(async (req, res) => {
+    const url = _popularTypeToUrl(req.body.type)
+    delete req.body.type
+    const result = await api.post(url, req.body)
+    await _handleRequest(result, res)
+  })
+
 async function _handleRequest(result, res) {
   let posts = Object.assign({}, result)
   if (useCache) posts = await _downloadImages(result)
@@ -108,6 +123,19 @@ async function _saveImage(imageStream, id, postType, imageName) {
   const fileName = path.resolve(filePath, imageName)
   if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
   imageStream.pipe(fs.createWriteStream(fileName))
+}
+
+function _popularTypeToUrl(type) {
+  switch (type) {
+    case 'day':
+      return '/post/popular_by_day.json'
+    case 'week':
+      return '/post/popular_by_week.json'
+    case 'month':
+      return '/post/popular_by_month.json'
+    default:
+      return '/post/popular_by_day.json'
+  }
 }
 
 module.exports = postRouter

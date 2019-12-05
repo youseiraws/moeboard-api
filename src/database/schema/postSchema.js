@@ -46,6 +46,7 @@ const postSchema = new mongoose.Schema(
     frames_string: String,
     frames: Array,
     flag_detail: String,
+    operate_time: Number,
     [cache]: {
       preview: {
         id: ObjectId,
@@ -74,12 +75,16 @@ const postSchema = new mongoose.Schema(
 
 postSchema.statics = {
   insertPosts(posts) {
-    if (!(posts instanceof Array)) return posts
+    if (!(posts instanceof Array)) return
 
     posts.forEach(async post => {
-      if (!(await this.isPostExists(post.id))) await this.create(post)
-      else if (await this.isPostExpired(post.id))
+      if (!(await this.isPostExists(post.id))) {
+        post.operate_time = Date.now()
+        await this.create(post)
+      } else if (await this.isPostExpired(post.id)) {
+        post.operate_time = Date.now()
         await this.updateOne({ id: post.id }, post)
+      }
     })
   },
   async isPostExists(id) {
@@ -92,7 +97,7 @@ postSchema.statics = {
     if (post === null) return false
 
     return (
-      Date.now() - post._id.getTimestamp().getTime() >
+      Date.now() - post.operate_time >
       util.getTimestamp(expired.time, expired.unit)
     )
   },
