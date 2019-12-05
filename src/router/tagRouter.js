@@ -37,10 +37,9 @@ tagRouter
   })
 
 function _handleRequest(result, res, hasPageProperty = true) {
-  let tags
   if (hasPageProperty) {
     const $ = cheerio.load(result)
-    tags = $('table.highlightable>tbody>tr')
+    result = $('table.highlightable>tbody>tr')
       .map((i, el) => {
         const tds = $(el).children('td')
         return {
@@ -63,10 +62,9 @@ function _handleRequest(result, res, hasPageProperty = true) {
         }
       })
       .get()
-  } else tags = result
-
-  res.json(tags)
-  if (useMongoDB) Tag.insertTags(tags)
+  }
+  res.json(result)
+  if (useMongoDB) Tag.insertTags(result)
 }
 
 module.exports = tagRouter
