@@ -64,11 +64,20 @@ postRouter
     await _handleRequest(result, res)
   })
 
-async function _handleRequest(result, res) {
+postRouter
+  .route('/cache')
+  .get(async (req, res) => {
+    await _handleRequest(req.query.posts, res, false)
+  })
+  .post(async (req, res) => {
+    await _handleRequest(req.body.posts, res, false)
+  })
+
+async function _handleRequest(result, res, needCache = true) {
   let posts = Object.assign({}, result)
   if (useCache) posts = await _downloadImages(result)
   res.json(posts)
-  if (useMongoDB) Post.insertPosts(result)
+  if (useMongoDB && needCache) Post.insertPosts(result)
 }
 
 async function _downloadImages(posts) {
@@ -80,7 +89,6 @@ async function _downloadImages(posts) {
             post.id,
             postType,
             post[`${postType}_url`],
-            post[cache],
           )
           if (cacheUrl !== undefined) {
             if (post[cache] === undefined) post[cache] = {}
@@ -94,10 +102,7 @@ async function _downloadImages(posts) {
 }
 
 async function _downloadImage(id, postType, url) {
-  const imageName = decodeURI(url.split('/').reverse()[0]).replace(
-    /%5C|%2F|%3A|%2A|%3F|%22|%3C|%3E|%7C/g,
-    '',
-  )
+  const imageName = util.decodeImageName(url.split('/').reverse()[0])
   if (useMongoDB) {
     if (await Post.hasImageDownloaded(id, postType)) {
       return await Post.getCacheImageUrl(id, postType)

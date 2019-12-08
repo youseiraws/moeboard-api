@@ -24,4 +24,10 @@ module.exports = {
   async getRawBody(stream) {
     await getRawBody(stream)
   },
+  decodeImageName(imageName) {
+    return decodeURIComponent(imageName).replace(
+      /\\|\/|\:|\*|\?|\"|\<|\>|\|/g,
+      '',
+    )
+  },
 }

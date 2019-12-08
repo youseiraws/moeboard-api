@@ -156,7 +156,9 @@ postSchema.statics = {
     if (post !== null && !post.$isEmpty(cache)) {
       const postObj = post.toObject()
       const type = postObj[cache][postType]
-      const imageName = postObj[`${postType}_url`].split('/').reverse()[0]
+      const imageName = util.decodeImageName(
+        postObj[`${postType}_url`].split('/').reverse()[0],
+      )
       if (type.path !== undefined && fs.existsSync(type.path)) {
         const imageUrl =
           type.url !== undefined
