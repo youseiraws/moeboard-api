@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const _ = require('lodash')
 const express = require('express')
 const mongoose = require('mongoose')
 const api = require('../api')
@@ -29,24 +30,49 @@ postRouter
 postRouter
   .route('/random')
   .get(async (req, res) => {
-    if (req.query.tags === undefined || req.query.tags.length === 0) {
-      req.query.tags = 'order:random'
-    } else {
-      req.query.tags += ' order:random'
-    }
+    if (_.isEmpty(req.query.tags)) req.query.tags = 'order:random'
+    else req.query.tags += ' order:random'
+
     const result = await api.get(
       `${routeName}.json${util.toQueryString(req.query)}`,
     )
     await _handleRequest(result, res)
   })
   .post(async (req, res) => {
-    if (req.body.tags === undefined || req.body.tags.length === 0) {
-      req.body.tags = 'order:random'
-    } else {
-      req.body.tags += ' order:random'
-    }
+    if (_.isEmpty(req.body.tags)) req.body.tags = 'order:random'
+    else req.body.tags += ' order:random'
+
     const result = await api.post(`${routeName}.json`, req.body)
     await _handleRequest(result, res)
+  })
+
+postRouter
+  .route('/cover')
+  .get(async (req, res) => {
+    post = await Post.getCover(req.query.tags)
+    if (post !== undefined) res.json([post])
+    else {
+      if (_.isEmpty(req.query.tags)) req.query.tags = 'order:random'
+      else req.query.tags += ' order:random'
+      req.query.limit = 1
+
+      const result = await api.get(
+        `${routeName}.json${util.toQueryString(req.query)}`,
+      )
+      await _handleRequest(result, res)
+    }
+  })
+  .post(async (req, res) => {
+    post = await Post.getCover(req.body.tags)
+    if (post !== undefined) res.json([post])
+    else {
+      if (_.isEmpty(req.body.tags)) req.body.tags = 'order:random'
+      else req.body.tags += ' order:random'
+      req.body.limit = 1
+
+      const result = await api.post(`${routeName}.json`, req.body)
+      await _handleRequest(result, res)
+    }
   })
 
 postRouter
@@ -74,7 +100,7 @@ postRouter
   })
 
 async function _handleRequest(result, res, needCache = true) {
-  let posts = Object.assign({}, result)
+  let posts = result.slice()
   if (useCache) posts = await _downloadImages(result)
   res.json(posts)
   if (useMongoDB && needCache) Post.insertPosts(result)
