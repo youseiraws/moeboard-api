@@ -178,14 +178,9 @@ postSchema.statics = {
   async getCover(tags) {
     const posts = await this.find({ tags: new RegExp(tags, 'i') })
     if (!_.isEmpty(posts)) {
-      let post
-      do {
-        const index = _.random(posts.length - 1)
-        post = posts[index]
-        posts.splice(index, 1)
-      } while (post.$isEmpty(cache) && posts.length > 0)
-
-      return post.toObject()
+      let postObj = posts[_.random(posts.length - 1)].toObject()
+      delete postObj[cache]
+      return postObj
     }
   },
 }

@@ -49,8 +49,8 @@ postRouter
 postRouter
   .route('/cover')
   .get(async (req, res) => {
-    post = await Post.getCover(req.query.tags)
-    if (post !== undefined) res.json([post])
+    const post = await Post.getCover(req.query.tags)
+    if (post !== undefined) await _handleRequest([post], res, false)
     else {
       if (_.isEmpty(req.query.tags)) req.query.tags = 'order:random'
       else req.query.tags += ' order:random'
@@ -63,8 +63,8 @@ postRouter
     }
   })
   .post(async (req, res) => {
-    post = await Post.getCover(req.body.tags)
-    if (post !== undefined) res.json([post])
+    const post = await Post.getCover(req.body.tags)
+    if (post !== undefined) await _handleRequest([post], res, false)
     else {
       if (_.isEmpty(req.body.tags)) req.body.tags = 'order:random'
       else req.body.tags += ' order:random'
@@ -128,6 +128,7 @@ async function _downloadImages(posts) {
 }
 
 async function _downloadImage(id, postType, url) {
+  if (_.isEmpty(url)) return url
   const imageName = util.decodeImageName(url.split('/').reverse()[0])
   if (useMongoDB) {
     if (await Post.hasImageDownloaded(id, postType)) {
