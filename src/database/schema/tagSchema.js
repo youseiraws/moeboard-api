@@ -43,6 +43,9 @@ tagSchema.statics = {
       util.getTimestamp(expired.time, expired.unit)
     )
   },
+  async getTag(name) {
+    return await this.findOne({ name })
+  },
 }
 
 mongoose.model('Tag', tagSchema, 'tags')

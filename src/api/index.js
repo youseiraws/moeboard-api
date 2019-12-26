@@ -1,6 +1,6 @@
 const Http = require('../util/http')
 
-const api = new Http(sourceToUrl(global.$config.source))
+const api = new Http(sourceToUrl(global.$config.source), 120000)
 
 function sourceToUrl(source) {
   switch (source) {

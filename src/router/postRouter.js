@@ -11,6 +11,7 @@ const useCache = global.$config.useCache
 const useMongoDB = global.$config.useMongoDB
 const cachePostTypes = global.$config.cachePostTypes
 const Post = useMongoDB ? mongoose.model('Post') : null
+const Tag = useMongoDB ? mongoose.model('Tag') : null
 const postRouter = express.Router()
 const routeName = '/post'
 
@@ -101,9 +102,36 @@ postRouter
 
 async function _handleRequest(result, res, needCache = true) {
   let posts = result.slice()
+  posts = await _syncTags(posts)
   if (useCache) posts = await _downloadImages(result)
   res.json(posts)
   if (useMongoDB && needCache) Post.insertPosts(result)
+}
+
+async function _syncTags(posts) {
+  return await Promise.all(
+    posts.map(async post => {
+      await Promise.all(
+        post.tags.split(' ').map(async name => {
+          let exactTag
+          if (useMongoDB) exactTag = await Tag.getTag(name)
+          if (_.isEmpty(exactTag)) {
+            const result = await api.get(`tag.json?name=${name}`)
+            if (!_.isEmpty(result)) {
+              exactTag = result.find(tag => _.isEqual(tag.name, name))
+              if (useMongoDB) Tag.insertTags(result)
+            }
+          }
+          if (!_.isEmpty(exactTag)) {
+            if (post[cache] === undefined) post[cache] = {}
+            if (post[cache].tags === undefined) post[cache].tags = []
+            post[cache].tags.push(exactTag)
+          }
+        }),
+      )
+      return post
+    }),
+  )
 }
 
 async function _downloadImages(posts) {
