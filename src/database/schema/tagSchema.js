@@ -8,7 +8,7 @@ const tagSchema = new mongoose.Schema(
     id: Number,
     name: String,
     count: Number,
-    type: String,
+    type: Number,
     ambiguous: Boolean,
     operate_time: Number,
   },

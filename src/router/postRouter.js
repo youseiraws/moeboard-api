@@ -102,7 +102,7 @@ postRouter
 
 async function _handleRequest(result, res, needCache = true) {
   let posts = result.slice()
-  posts = await _syncTags(posts)
+  if (needCache) posts = await _syncTags(posts)
   if (useCache) posts = await _downloadImages(result)
   res.json(posts)
   if (useMongoDB && needCache) Post.insertPosts(result)

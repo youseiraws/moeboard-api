@@ -4,7 +4,7 @@ const download = require('download')
 class Http {
   constructor(baseURL, timeout = 60000) {
     this.baseURL = baseURL
-    this.timeout = 60000
+    this.timeout = timeout
     this._init()
   }
 

@@ -58,7 +58,12 @@ function _handleRequest(result, res, hasPageProperty = true) {
             .eq(1)
             .text(),
           count: parseInt(tds.eq(0).text()),
-          type: tds.eq(2).text(),
+          type: util.tagTypeToInt(
+            tds
+              .eq(2)
+              .text()
+              .split(',')[0],
+          ),
         }
       })
       .get()

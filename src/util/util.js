@@ -30,4 +30,22 @@ module.exports = {
       '',
     )
   },
+  tagTypeToInt(tagType) {
+    switch (tagType) {
+      case 'general':
+        return 0
+      case 'artist':
+        return 1
+      case 'copyright':
+        return 3
+      case 'character':
+        return 4
+      case 'style':
+        return 5
+      case 'circle':
+        return 6
+      default:
+        return 0
+    }
+  },
 }
