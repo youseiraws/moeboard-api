@@ -49,6 +49,7 @@ const postSchema = new mongoose.Schema(
     flag_detail: String,
     operate_time: Number,
     [cache]: {
+      tags: Array,
       preview: {
         id: ObjectId,
         path: String,

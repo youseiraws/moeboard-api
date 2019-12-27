@@ -102,8 +102,8 @@ postRouter
 
 async function _handleRequest(result, res, needCache = true) {
   let posts = result.slice()
-  if (needCache) posts = await _syncTags(posts)
-  if (useCache) posts = await _downloadImages(result)
+  if (needCache) posts = await _syncTags(result)
+  if (useCache) posts = await downloadImages(posts)
   res.json(posts)
   if (useMongoDB && needCache) Post.insertPosts(result)
 }
@@ -134,7 +134,7 @@ async function _syncTags(posts) {
   )
 }
 
-async function _downloadImages(posts) {
+async function downloadImages(posts) {
   return await Promise.all(
     posts.map(async post => {
       await Promise.all(
@@ -147,6 +147,7 @@ async function _downloadImages(posts) {
           if (cacheUrl !== undefined) {
             if (post[cache] === undefined) post[cache] = {}
             post[cache][`${postType}_url`] = cacheUrl
+            _.unset(post, [cache, postType])
           }
         }),
       )
@@ -198,4 +199,7 @@ function _popularTypeToUrl(type) {
   }
 }
 
-module.exports = postRouter
+module.exports = {
+  postRouter,
+  downloadImages,
+}
