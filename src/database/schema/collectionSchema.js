@@ -18,6 +18,12 @@ collectionSchema.statics = {
         posts: [],
       })
   },
+  async editCollection(oldName, newName) {
+    const collection = await this.findOne({ name: oldName })
+    if (collection === null) return
+    collection.name = newName
+    await collection.save()
+  },
   async removeCollection(name) {
     await this.deleteOne({ name })
   },
@@ -52,15 +58,15 @@ collectionSchema.statics = {
     await collection.save()
   },
   async black(id) {
-    let collection = await this.findOne({ name: 'blacklist' })
-    if (collection === null) collection = await this.addCollection('blacklist')
+    let collection = await this.findOne({ name: '黑名单' })
+    if (collection === null) collection = await this.addCollection('黑名单')
     if (collection.posts.includes(parseInt(id))) return
     collection.posts.push(parseInt(id))
     await collection.save()
   },
   async unblack(id) {
-    let collection = await this.findOne({ name: 'blacklist' })
-    if (collection === null) collection = await this.addCollection('blacklist')
+    let collection = await this.findOne({ name: '黑名单' })
+    if (collection === null) collection = await this.addCollection('黑名单')
     collection.posts = collection.posts.filter(post => post !== parseInt(id))
     await collection.save()
   },

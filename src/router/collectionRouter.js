@@ -19,6 +19,17 @@ collectionRouter
   })
 
 collectionRouter
+  .route(`${routeName}/edit`)
+  .get(async (req, res, next) => {
+    await Collection.editCollection(req.query.oldname, req.query.newname)
+    next()
+  })
+  .post(async (req, res, next) => {
+    await Collection.editCollection(req.body.oldname, req.body.newname)
+    next()
+  })
+
+collectionRouter
   .route(`${routeName}/remove`)
   .get(async (req, res, next) => {
     await Collection.removeCollection(req.query.name)
@@ -30,7 +41,7 @@ collectionRouter
   })
 
 collectionRouter
-  .route(`${routeName}/collections`)
+  .route(`${routeName}/list`)
   .get(async (req, res, next) => {
     next()
   })
@@ -82,7 +93,7 @@ collectionRouter
     next()
   })
 
-collectionRouter.use(async (req, res) => {
+collectionRouter.route(`${routeName}/*`).all(async (req, res) => {
   let collections = await Collection.getCollections()
   collections = await Promise.all(
     collections.map(async collection => {

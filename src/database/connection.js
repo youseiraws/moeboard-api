@@ -16,4 +16,8 @@ exports.connect = function(source = global.$config.source) {
     tagSchema: require('./schema/tagSchema'),
     collectionSchema: require('./schema/collectionSchema'),
   }
+
+  const Collection = mongoose.model('Collection')
+  Collection.addCollection('默认收藏集')
+  Collection.addCollection('黑名单')
 }
