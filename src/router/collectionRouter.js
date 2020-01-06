@@ -93,6 +93,28 @@ collectionRouter
     next()
   })
 
+collectionRouter
+  .route(`${routeName}/tag`)
+  .get(async (req, res, next) => {
+    await Collection.tag(req.query.id)
+    next()
+  })
+  .post(async (req, res, next) => {
+    await Collection.tag(req.body.id)
+    next()
+  })
+
+collectionRouter
+  .route(`${routeName}/untag`)
+  .get(async (req, res, next) => {
+    await Collection.untag(req.query.id)
+    next()
+  })
+  .post(async (req, res, next) => {
+    await Collection.untag(req.body.id)
+    next()
+  })
+
 collectionRouter.route(`${routeName}/*`).all(async (req, res) => {
   let collections = await Collection.getCollections()
   collections = await Promise.all(

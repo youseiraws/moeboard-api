@@ -15,9 +15,11 @@ exports.connect = function(source = global.$config.source) {
     postSchema: require('./schema/postSchema'),
     tagSchema: require('./schema/tagSchema'),
     collectionSchema: require('./schema/collectionSchema'),
+    settingSchema: require('./schema/settingSchema'),
   }
 
   const Collection = mongoose.model('Collection')
   Collection.addCollection('默认收藏集')
   Collection.addCollection('黑名单')
+  Collection.addCollection('标签管理')
 }

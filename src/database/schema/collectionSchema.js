@@ -1,11 +1,15 @@
 const mongoose = require('mongoose')
 
 const Post = mongoose.model('Post')
+const Tag = mongoose.model('Tag')
+const BLACKLIST = '黑名单'
+const TAG_MANAGEMENT = '标签管理'
 
 const collectionSchema = new mongoose.Schema(
   {
     name: String,
     posts: Array,
+    tags: Array,
   },
   { id: false },
 )
@@ -34,12 +38,20 @@ collectionSchema.statics = {
     const collections = await this.find()
     return await Promise.all(
       collections.map(async collection => {
-        await Promise.all(
-          collection.posts.map(async (id, index, arr) => {
-            const post = await Post.findOne({ id })
-            if (post !== null) arr.splice(index, 1, post.toObject())
-          }),
-        )
+        if (collection.name === TAG_MANAGEMENT)
+          await Promise.all(
+            collection.tags.map(async id => {
+              const tag = await Tag.findOne({ id })
+              if (tag !== null) return tag
+            }),
+          )
+        else
+          await Promise.all(
+            collection.posts.map(async (id, index, arr) => {
+              const post = await Post.findOne({ id })
+              if (post !== null) arr.splice(index, 1, post.toObject())
+            }),
+          )
         return collection
       }),
     )
@@ -58,16 +70,31 @@ collectionSchema.statics = {
     await collection.save()
   },
   async black(id) {
-    let collection = await this.findOne({ name: '黑名单' })
-    if (collection === null) collection = await this.addCollection('黑名单')
+    let collection = await this.findOne({ name: BLACKLIST })
+    if (collection === null) collection = await this.addCollection(BLACKLIST)
     if (collection.posts.includes(parseInt(id))) return
     collection.posts.push(parseInt(id))
     await collection.save()
   },
   async unblack(id) {
-    let collection = await this.findOne({ name: '黑名单' })
-    if (collection === null) collection = await this.addCollection('黑名单')
+    let collection = await this.findOne({ name: BLACKLIST })
+    if (collection === null) collection = await this.addCollection(BLACKLIST)
     collection.posts = collection.posts.filter(post => post !== parseInt(id))
+    await collection.save()
+  },
+  async tag(id) {
+    let collection = await this.findOne({ name: TAG_MANAGEMENT })
+    if (collection === null)
+      collection = await this.addCollection(TAG_MANAGEMENT)
+    if (collection.tags.includes(parseInt(id))) return
+    collection.tags.push(parseInt(id))
+    await collection.save()
+  },
+  async untag(id) {
+    let collection = await this.findOne({ name: TAG_MANAGEMENT })
+    if (collection === null)
+      collection = await this.addCollection(TAG_MANAGEMENT)
+    collection.tags = collection.tags.filter(tag => tag !== parseInt(id))
     await collection.save()
   },
 }
