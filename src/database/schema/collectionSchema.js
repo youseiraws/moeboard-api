@@ -40,9 +40,9 @@ collectionSchema.statics = {
       collections.map(async collection => {
         if (collection.name === TAG_MANAGEMENT)
           await Promise.all(
-            collection.tags.map(async id => {
+            collection.tags.map(async (id, index, arr) => {
               const tag = await Tag.findOne({ id })
-              if (tag !== null) return tag
+              if (tag !== null) arr.splice(index, 1, tag.toObject())
             }),
           )
         else

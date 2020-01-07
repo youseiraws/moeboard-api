@@ -12,7 +12,7 @@ const settingSchema = new mongoose.Schema(
 
 settingSchema.statics = {
   async updateSetting(name, value) {
-    this.update({ name }, { name, value }, { upsert: true })
+    await this.update({ name }, { name, value }, { upsert: true })
   },
   async getSettings() {
     return await this.find()
