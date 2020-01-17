@@ -70,6 +70,11 @@ const postSchema = new mongoose.Schema(
         path: String,
         url: String,
       },
+      crop: {
+        id: ObjectId,
+        path: String,
+        url: String,
+      },
     },
   },
   { id: false },
@@ -103,30 +108,36 @@ postSchema.statics = {
       util.getTimestamp(expired.time, expired.unit)
     )
   },
-  saveImage(imageStream, id, postType, imageName) {
-    this.saveImageToDB(imageStream, id, postType, imageName)
-    this.saveImageToCache(imageStream, id, postType, imageName)
+  async saveImage(imageStream, id, postType, imageName) {
+    await this.saveImageToDB(imageStream, id, postType, imageName)
+    await this.saveImageToCache(imageStream, id, postType, imageName)
   },
   saveImageToDB(imageStream, id, postType, imageName) {
-    if (global.$gfs === undefined) return
+    return new Promise(resolve => {
+      if (global.$gfs === undefined) return
 
-    const gridFsStream = global.$gfs.createWriteStream({ imageName })
-    imageStream.pipe(gridFsStream)
-    gridFsStream.on('close', async file => {
-      let post = await this.findOne({ id })
-      post[cache][postType].id = file._id
-      await post.save()
+      const gridFsStream = global.$gfs.createWriteStream({ imageName })
+      imageStream.pipe(gridFsStream)
+      gridFsStream.on('close', async file => {
+        let post = await this.findOne({ id })
+        post[cache][postType].id = file._id
+        await post.save()
+        resolve()
+      })
     })
   },
   saveImageToCache(imageStream, id, postType, imageName) {
-    const filePath = path.resolve(cache, id.toString(), postType)
-    const fileName = path.resolve(filePath, imageName)
-    if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
-    const cacheStream = fs.createWriteStream(fileName)
-    imageStream.pipe(cacheStream)
-    cacheStream.on('close', async () => {
-      await this.saveImagePath(id, postType, imageName)
-      await this.saveImageUrl(id, postType, imageName)
+    return new Promise(resolve => {
+      const filePath = path.resolve(cache, id.toString(), postType)
+      const fileName = path.resolve(filePath, imageName)
+      if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
+      const cacheStream = fs.createWriteStream(fileName)
+      imageStream.pipe(cacheStream)
+      cacheStream.on('close', async () => {
+        await this.saveImagePath(id, postType, imageName)
+        await this.saveImageUrl(id, postType, imageName)
+        resolve()
+      })
     })
   },
   async saveImagePath(id, postType, imageName) {
@@ -147,7 +158,7 @@ postSchema.statics = {
     await post.save()
     return imageUrl
   },
-  async hasImageDownloaded(id, postType) {
+  async hasImageCached(id, postType) {
     const post = await this.findOne({ id })
     if (post === null) return false
 
@@ -158,22 +169,25 @@ postSchema.statics = {
     if (post !== null && !post.$isEmpty(cache)) {
       const postObj = post.toObject()
       const type = postObj[cache][postType]
-      const imageName = util.decodeImageName(
-        postObj[`${postType}_url`].split('/').reverse()[0],
-      )
-      if (type.path !== undefined && fs.existsSync(type.path)) {
-        const imageUrl =
-          type.url !== undefined
-            ? type.url
-            : await this.saveImageUrl(id, postType, imageName)
-        return `http://${global.$config.hostname}:${global.$config.port}/${imageUrl}`
-      } else
-        this.saveImageToCache(
+      const imageUrl =
+        type.url !== undefined
+          ? type.url
+          : await this.saveImageUrl(id, postType, imageName)
+      const imageName =
+        postObj[`${postType}_url`] !== undefined
+          ? util.decodeImageName(
+              postObj[`${postType}_url`].split('/').reverse()[0],
+            )
+          : imageUrl.split('/').reverse()[0]
+      if (type.path === undefined || !fs.existsSync(type.path)) {
+        await this.saveImageToCache(
           global.$gfs.createReadStream({ _id: type.id }),
           id,
           postType,
           imageName,
         )
+      }
+      return `http://${global.$config.hostname}:${global.$config.port}/${imageUrl}`
     }
   },
   async getCover(tags) {

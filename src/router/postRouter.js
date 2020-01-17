@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { Readable } = require('stream')
 const _ = require('lodash')
 const express = require('express')
 const mongoose = require('mongoose')
@@ -14,6 +15,7 @@ const Post = useMongoDB ? mongoose.model('Post') : null
 const Tag = useMongoDB ? mongoose.model('Tag') : null
 const postRouter = express.Router()
 const routeName = '/post'
+const cropType = 'crop'
 
 postRouter
   .route(routeName)
@@ -100,12 +102,33 @@ postRouter
     await _handleRequest(req.body.posts, res, false)
   })
 
+postRouter
+  .route('/crop')
+  .get(async (req, res) => {
+    await _saveCroppedImage(req.query, res)
+  })
+  .post(async (req, res) => {
+    await _saveCroppedImage(req.body, res)
+  })
+
 async function _handleRequest(result, res, needCache = true) {
   let posts = result.slice()
   if (needCache) posts = await _syncTags(result)
   if (useCache) posts = await downloadImages(posts)
   res.json(posts)
   if (useMongoDB && needCache) Post.insertPosts(result)
+}
+
+async function _saveCroppedImage({ id, name, crop }, res) {
+  let cropUrl = ''
+  if (useMongoDB) {
+    await Post.saveImage(new Readable().push(crop), id, cropType, name)
+    cropUrl = await Post.getCacheImageUrl(id, cropType)
+  } else {
+    await _saveImage((new Readable().push(crop), id, cropType, name))
+    cropUrl = await _getCacheImageUrl(id, cropType, name)
+  }
+  res.json({ id, [cache]: { crop_url: cropUrl } })
 }
 
 async function _syncTags(posts) {
@@ -138,11 +161,11 @@ async function downloadImages(posts) {
   return await Promise.all(
     posts.map(async post => {
       await Promise.all(
-        cachePostTypes.map(async postType => {
+        [...cachePostTypes, cropType].map(async postType => {
           const cacheUrl = await _downloadImage(
             post.id,
             postType,
-            post[`${postType}_url`],
+            post[`${postType}_url`] || post.file_url,
           )
           if (cacheUrl !== undefined) {
             if (post[cache] === undefined) post[cache] = {}
@@ -157,20 +180,21 @@ async function downloadImages(posts) {
 }
 
 async function _downloadImage(id, postType, url) {
-  if (_.isEmpty(url)) return url
   const imageName = util.decodeImageName(url.split('/').reverse()[0])
   if (useMongoDB) {
-    if (await Post.hasImageDownloaded(id, postType)) {
+    if (await Post.hasImageCached(id, postType))
       return await Post.getCacheImageUrl(id, postType)
-    } else Post.saveImage(api.download(url), id, postType, imageName)
+    else if (postType !== cropType)
+      Post.saveImage(api.download(url), id, postType, imageName)
   } else {
-    if (_hasImageDownloaded(id, postType, imageName)) {
+    if (_hasImageCached(id, postType, imageName))
       return _getCacheImageUrl(id, postType, imageName)
-    } else _saveImage(api.download(url), id, postType, imageName)
+    else if (postType !== cropType)
+      _saveImage(api.download(url), id, postType, imageName)
   }
 }
 
-function _hasImageDownloaded(id, postType, imageName) {
+function _hasImageCached(id, postType, imageName) {
   return fs.existsSync(path.resolve(cache, id.toString(), postType, imageName))
 }
 
@@ -179,11 +203,15 @@ function _getCacheImageUrl(id, postType, imageName) {
   return `http://${global.$config.hostname}:${global.$config.port}/${imageUrl}`
 }
 
-async function _saveImage(imageStream, id, postType, imageName) {
-  const filePath = path.resolve(cache, id.toString(), postType)
-  const fileName = path.resolve(filePath, imageName)
-  if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
-  imageStream.pipe(fs.createWriteStream(fileName))
+function _saveImage(imageStream, id, postType, imageName) {
+  return new Promise(resolve => {
+    const filePath = path.resolve(cache, id.toString(), postType)
+    const fileName = path.resolve(filePath, imageName)
+    if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
+    const cacheStream = fs.createWriteStream(fileName)
+    imageStream.pipe(cacheStream)
+    cacheStream.on('close', () => resolve())
+  })
 }
 
 function _popularTypeToUrl(type) {
