@@ -1,4 +1,4 @@
-const getRawBody = require('raw-body')
+const intoStream = require('into-stream')
 
 module.exports = {
   toQueryString(query) {
@@ -20,9 +20,6 @@ module.exports = {
       case 'day':
         return duration * 24 * 60 * 60 * 1000
     }
-  },
-  async getRawBody(stream) {
-    await getRawBody(stream)
   },
   decodeImageName(imageName) {
     return decodeURIComponent(imageName).replace(
@@ -48,4 +45,5 @@ module.exports = {
         return 0
     }
   },
+  intoStream,
 }

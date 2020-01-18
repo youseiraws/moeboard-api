@@ -81,18 +81,20 @@ const postSchema = new mongoose.Schema(
 )
 
 postSchema.statics = {
-  insertPosts(posts) {
+  async insertPosts(posts) {
     if (!(posts instanceof Array)) return
 
-    posts.forEach(async post => {
-      if (!(await this.isPostExists(post.id))) {
-        post.operate_time = Date.now()
-        await this.create(post)
-      } else if (await this.isPostExpired(post.id)) {
-        post.operate_time = Date.now()
-        await this.updateOne({ id: post.id }, post)
-      }
-    })
+    await Promise.all(
+      posts.map(async post => {
+        if (!(await this.isPostExists(post.id))) {
+          post.operate_time = Date.now()
+          await this.create(post)
+        } else if (await this.isPostExpired(post.id)) {
+          post.operate_time = Date.now()
+          await this.updateOne({ id: post.id }, post)
+        }
+      }),
+    )
   },
   async isPostExists(id) {
     return await this.exists({ id })
@@ -109,8 +111,10 @@ postSchema.statics = {
     )
   },
   async saveImage(imageStream, id, postType, imageName) {
-    await this.saveImageToDB(imageStream, id, postType, imageName)
-    await this.saveImageToCache(imageStream, id, postType, imageName)
+    await Promise.all([
+      this.saveImageToDB(imageStream, id, postType, imageName),
+      this.saveImageToCache(imageStream, id, postType, imageName),
+    ])
   },
   saveImageToDB(imageStream, id, postType, imageName) {
     return new Promise(resolve => {

@@ -112,21 +112,32 @@ postRouter
   })
 
 async function _handleRequest(result, res, needCache = true) {
-  let posts = result.slice()
-  if (needCache) posts = await _syncTags(result)
-  if (useCache) posts = await downloadImages(posts)
-  res.json(posts)
-  if (useMongoDB && needCache) Post.insertPosts(result)
+  if (needCache) result = await _syncTags(result)
+  if (useMongoDB && needCache) await Post.insertPosts(result)
+  if (useCache) result = await downloadImages(result)
+  res.json(result)
 }
 
-async function _saveCroppedImage({ id, name, crop }, res) {
+async function _saveCroppedImage({ post, crop }, res) {
+  const id = post.id
+  const imageName = util.decodeImageName(post.file_url.split('/').reverse()[0])
   let cropUrl = ''
   if (useMongoDB) {
-    await Post.saveImage(new Readable().push(crop), id, cropType, name)
+    await Post.saveImage(
+      util.intoStream(new Buffer(crop, 'base64')),
+      id,
+      cropType,
+      imageName,
+    )
     cropUrl = await Post.getCacheImageUrl(id, cropType)
   } else {
-    await _saveImage((new Readable().push(crop), id, cropType, name))
-    cropUrl = await _getCacheImageUrl(id, cropType, name)
+    await _saveImage(
+      util.intoStream(new Buffer(crop, 'base64')),
+      id,
+      cropType,
+      imageName,
+    )
+    cropUrl = await _getCacheImageUrl(id, cropType, imageName)
   }
   res.json({ id, [cache]: { crop_url: cropUrl } })
 }
@@ -139,7 +150,7 @@ async function _syncTags(posts) {
           let exactTag
           if (useMongoDB) exactTag = await Tag.getTag(name)
           if (_.isEmpty(exactTag)) {
-            const result = await api.get(`tag.json?name=${name}`)
+            const result = await api.post(`tag.json`, { name })
             if (!_.isEmpty(result)) {
               exactTag = result.find(tag => _.isEqual(tag.name, name))
               if (useMongoDB) Tag.insertTags(result)
