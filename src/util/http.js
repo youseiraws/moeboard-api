@@ -16,12 +16,12 @@ class Http {
     this.http.interceptors.response.use(res => res.data)
   }
 
-  async get(url, params) {
-    return await this.http.get(url, { params })
+  async get(url, params, timeout = this.timeout) {
+    return await this.http.get(url, { params, timeout })
   }
 
-  async post(url, data) {
-    return await this.http.post(url, data)
+  async post(url, data, timeout = this.timeout) {
+    return await this.http.post(url, data, { timeout })
   }
 
   download(uri) {

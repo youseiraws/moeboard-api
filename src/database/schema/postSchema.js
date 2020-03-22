@@ -7,6 +7,8 @@ const util = require('../../util/util')
 const ObjectId = mongoose.Schema.Types.ObjectId
 const cache = global.$config.cache
 const expired = global.$config.expired
+const cachePostTypes = global.$config.cachePostTypes
+const cropType = 'crop'
 
 const postSchema = new mongoose.Schema(
   {
@@ -46,7 +48,7 @@ const postSchema = new mongoose.Schema(
     frames_pending: Array,
     frames_string: String,
     frames: Array,
-    flag_detail: String,
+    flag_detail: Object,
     operate_time: Number,
     [cache]: {
       tags: Array,
@@ -121,13 +123,14 @@ postSchema.statics = {
       if (global.$gfs === undefined) return
 
       const gridFsStream = global.$gfs.createWriteStream({ imageName })
-      imageStream.pipe(gridFsStream)
       gridFsStream.on('close', async file => {
         let post = await this.findOne({ id })
         post[cache][postType].id = file._id
         await post.save()
         resolve()
       })
+      gridFsStream.on('error', err => {})
+      imageStream.pipe(gridFsStream)
     })
   },
   saveImageToCache(imageStream, id, postType, imageName) {
@@ -136,12 +139,13 @@ postSchema.statics = {
       const fileName = path.resolve(filePath, imageName)
       if (!fs.existsSync(filePath)) fs.mkdirSync(filePath, { recursive: true })
       const cacheStream = fs.createWriteStream(fileName)
-      imageStream.pipe(cacheStream)
       cacheStream.on('close', async () => {
         await this.saveImagePath(id, postType, imageName)
         await this.saveImageUrl(id, postType, imageName)
         resolve()
       })
+      cacheStream.on('error', err => {})
+      imageStream.pipe(cacheStream)
     })
   },
   async saveImagePath(id, postType, imageName) {
@@ -173,16 +177,16 @@ postSchema.statics = {
     if (post !== null && !post.$isEmpty(cache)) {
       const postObj = post.toObject()
       const type = postObj[cache][postType]
-      const imageUrl =
-        type.url !== undefined
-          ? type.url
-          : await this.saveImageUrl(id, postType, imageName)
       const imageName =
         postObj[`${postType}_url`] !== undefined
           ? util.decodeImageName(
               postObj[`${postType}_url`].split('/').reverse()[0],
             )
-          : imageUrl.split('/').reverse()[0]
+          : type.url.split('/').reverse()[0]
+      const imageUrl =
+        type.url !== undefined
+          ? type.url
+          : await this.saveImageUrl(id, postType, imageName)
       if (type.path === undefined || !fs.existsSync(type.path)) {
         await this.saveImageToCache(
           global.$gfs.createReadStream({ _id: type.id }),
@@ -200,6 +204,21 @@ postSchema.statics = {
       let postObj = posts[_.random(posts.length - 1)].toObject()
       delete postObj[cache]
       return postObj
+    }
+  },
+  async removePost(id, postTypes) {
+    const post = await this.findOne({ id })
+    if (post === null) return
+
+    if (!post.$isEmpty(cache)) {
+      postTypes.forEach(postType => {
+        const type = post[cache][postType]
+        if (type !== undefined) {
+          if (type.id !== undefined) global.$gfs.remove({ _id: type.id })
+          post[cache][postType] = {}
+        }
+      })
+      await post.save()
     }
   },
 }

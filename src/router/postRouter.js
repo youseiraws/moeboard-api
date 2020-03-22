@@ -111,10 +111,25 @@ postRouter
     await _saveCroppedImage(req.body, res)
   })
 
-async function _handleRequest(result, res, needCache = true) {
+postRouter
+  .route('/reload')
+  .get(async (req, res) => {
+    await Post.removePost(req.query.id, req.query.postTypes)
+    const result = await api.get(`${routeName}.json?tags=id:${req.query.id}`)
+    await _handleRequest(result, res, true, true, req.query.postTypes)
+  })
+  .post(async (req, res) => {
+    await Post.removePost(req.body.id, req.body.postTypes)
+    const result = await api.post(`${routeName}.json`, {
+      tags: `id:${req.body.id}`,
+    })
+    await _handleRequest(result, res, true, true, req.body.postTypes)
+  })
+
+async function _handleRequest(result, res, needCache = true, sync, postTypes) {
   if (needCache) result = await _syncTags(result)
   if (useMongoDB && needCache) await Post.insertPosts(result)
-  if (useCache) result = await downloadImages(result)
+  if (useCache) result = await downloadImages(result, sync, postTypes)
   res.json(result)
 }
 
@@ -139,7 +154,7 @@ async function _saveCroppedImage({ post, crop }, res) {
     )
     cropUrl = await _getCacheImageUrl(id, cropType, imageName)
   }
-  res.json({ id, [cache]: { crop_url: cropUrl } })
+  res.json({ id, [cache]: { crop_url: cropUrl.replace(/#/g, '%23') } })
 }
 
 async function _syncTags(posts) {
@@ -150,7 +165,10 @@ async function _syncTags(posts) {
           let exactTag
           if (useMongoDB) exactTag = await Tag.getTag(name)
           if (_.isEmpty(exactTag)) {
-            const result = await api.post(`tag.json`, { name })
+            let result
+            try {
+              result = await api.post(`tag.json`, { name }, 5000)
+            } catch {}
             if (!_.isEmpty(result)) {
               exactTag = result.find(tag => _.isEqual(tag.name, name))
               if (useMongoDB) Tag.insertTags(result)
@@ -168,17 +186,19 @@ async function _syncTags(posts) {
   )
 }
 
-async function downloadImages(posts) {
+async function downloadImages(posts, sync, postTypes) {
   return await Promise.all(
     posts.map(async post => {
       await Promise.all(
-        [...cachePostTypes, cropType].map(async postType => {
-          const cacheUrl = await _downloadImage(
+        (postTypes || [...cachePostTypes, cropType]).map(async postType => {
+          let cacheUrl = await _downloadImage(
             post.id,
             postType,
             post[`${postType}_url`] || post.file_url,
+            sync,
           )
           if (cacheUrl !== undefined) {
+            cacheUrl = cacheUrl.replace(/#/g, '%23')
             if (post[cache] === undefined) post[cache] = {}
             post[cache][`${postType}_url`] = cacheUrl
             _.unset(post, [cache, postType])
@@ -190,18 +210,26 @@ async function downloadImages(posts) {
   )
 }
 
-async function _downloadImage(id, postType, url) {
+async function _downloadImage(id, postType, url, sync = false) {
   const imageName = util.decodeImageName(url.split('/').reverse()[0])
   if (useMongoDB) {
     if (await Post.hasImageCached(id, postType))
       return await Post.getCacheImageUrl(id, postType)
-    else if (postType !== cropType)
-      Post.saveImage(api.download(url), id, postType, imageName)
+    else if (postType !== cropType) {
+      if (sync) {
+        await Post.saveImage(api.download(url), id, postType, imageName)
+        return await Post.getCacheImageUrl(id, postType)
+      } else Post.saveImage(api.download(url), id, postType, imageName)
+    }
   } else {
     if (_hasImageCached(id, postType, imageName))
       return _getCacheImageUrl(id, postType, imageName)
-    else if (postType !== cropType)
-      _saveImage(api.download(url), id, postType, imageName)
+    else if (postType !== cropType) {
+      if (sync) {
+        await _saveImage(api.download(url), id, postType, imageName)
+        return _getCacheImageUrl(id, postType, imageName)
+      } else _saveImage(api.download(url), id, postType, imageName)
+    }
   }
 }
 
